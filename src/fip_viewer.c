@@ -14,6 +14,12 @@
 #define PAGE_NUM(filesize) (((filesize)+page_size-1)/page_size) 
 #define PAGE_IN_MEM(c) ((c) & 0x1)
 
+struct option {
+    int is_detail;
+    int just_list_file;
+    char *regular;
+};
+
 struct global_stats {
     uint64_t total_pages;
     uint64_t mem_pages;
@@ -27,11 +33,10 @@ enum LEVEL {
     WARN,
     ERROR
 }; 
-static int is_detail = 0;
-static char *regular;
 
 static int page_size = 0;
 static struct global_stats g_stats;
+static struct option opt; 
 
 void logger(enum LEVEL loglevel,char *fmt, ...) {
     va_list ap;
@@ -79,7 +84,7 @@ int check_file(char *fname, int *file_size) {
         return 0;
     }
    
-    if(regular && strncmp(regular, fname, strlen(regular)) != 0) {
+    if(opt.regular && strncmp(opt.regular, fname, strlen(opt.regular)) != 0) {
         return 0;
     }
     struct stat sb;
@@ -110,7 +115,13 @@ void print_summary() {
 void touch(char *fname) {
     int file_size = 0;
     if(!check_file(fname, &file_size)) return;
-    
+    if(opt.just_list_file)  {
+        char buf[128];
+        bytes_to_human(buf, file_size);        
+        fprintf(stderr, "filename: %s\tfilesize:%s\n", fname, buf);
+        return;
+    }
+
     int fd, npages;
     char *mmap_addr;
     fd = open(fname, O_RDONLY, 0);
@@ -139,7 +150,7 @@ void touch(char *fname) {
             pages_in_mem++;
         }
     }
-    if(is_detail) {
+    if(opt.is_detail) {
         fprintf(stderr, "%s\t page_in_mem:%d\ttotal_pages:%d\n", fname, pages_in_mem, npages);
     }
     g_stats.mem_pages += pages_in_mem;
@@ -189,7 +200,9 @@ void traverse_porcess(int pid) {
         }
     }
 
-    print_summary();
+    if(!opt.just_list_file) {
+        print_summary();
+    }
     closedir(proc_dir);
 }
 
@@ -199,6 +212,7 @@ static void usage() {
     printf("  -h show usage.\n");
     printf("  -p pid.\n");
     printf("  -d detail mode.\n");
+    printf("  -l just list files.\n");
     printf("============== FIP_VIEWER USAGE ==============\n");
     exit(1);
 }
@@ -208,18 +222,19 @@ int main(int argc, char **argv) {
     int is_usage = 0;
     int pid = 0;
 
-    while((ch = getopt(argc, argv, "p:r:dh")) != -1) {
+    while((ch = getopt(argc, argv, "p:r:dlh")) != -1) {
         switch(ch) {
         case 'p': pid = atoi(optarg); break;
         case 'h': is_usage = 1; break;
-        case 'd': is_detail = 1; break;
-        case 'r': regular = strdup(optarg); break;
+        case 'd': opt.is_detail = 1; break;
+        case 'l': opt.just_list_file = 1; break;
+        case 'r': opt.regular = strdup(optarg); break;
         }
     }
     if(is_usage || !pid) usage();
 
     page_size = sysconf(_SC_PAGESIZE);
     traverse_porcess(pid);
-    free(regular);
+    free(opt.regular);
     return 0;
 }
