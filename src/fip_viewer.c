@@ -1,3 +1,23 @@
+/*
+* ***************************************************************
+ * fip_view.c is tools to view file and pagecache in process
+ * author by @git-hulk at 2015-07-18 
+ * Copyright (C) 2015 Inc.
+ * *************************************************************
+
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -6,13 +26,20 @@
 #include <string.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#define C_RED "\033[31m"
+#define C_GREEN "\033[32m"
+#define C_YELLOW "\033[33m"
+#define C_PURPLE "\033[35m"
+#define C_NONE "\033[0m"
+
+#define PAGE_IN_MEM(c) ((c) & 0x1)
 #define PAGE_ALIGNED(addr) ((((long)addr) & (page_size - 1))== 0)
 #define PAGE_NUM(filesize) (((filesize)+page_size-1)/page_size) 
-#define PAGE_IN_MEM(c) ((c) & 0x1)
 
 struct option {
     int is_detail;
@@ -47,13 +74,14 @@ void logger(enum LEVEL loglevel,char *fmt, ...) {
     va_end(ap);
 
     char *msg = NULL;
+    const char *color = "";
     switch(loglevel) {
-    case DEBUG: msg = "DEBUG"; break;
-    case INFO: msg = "INFO"; break;
-    case WARN: msg = "WARN"; break;
-    case ERROR: msg = "ERROR"; break;
+      case DEBUG: msg = "DEBUG"; break;
+      case INFO: msg = "INFO"; color = C_YELLOW ; break;
+      case WARN: msg = "WARN"; color= C_PURPLE; break;
+      case ERROR: msg = "ERROR"; color = C_RED; break;
     }
-    fprintf(stderr, "%s: %s\n", msg, buf);
+    fprintf(stderr, "%s%s: %s\n"C_NONE, color, msg, buf);
     if(loglevel >= ERROR) {
         exit(1);
     }
@@ -102,14 +130,25 @@ void print_summary() {
     char mp_buf[128];
     bytes_to_human(tp_buf,g_stats.total_pages*4096), 
     bytes_to_human(mp_buf,g_stats.mem_pages*4096), 
-    fprintf(stderr, "\n========================== SUMMARY ==========================\n");
+    fprintf(stderr, C_GREEN "========================== SUMMARY ==========================\n");
     fprintf(stderr, 
-        "SUMMARY: total size:%s, page in mem: %s, ratio: %.3f%%\n", 
+        "total_size: %s\n" \
+        "mem_page_size: %s\n" \
+        "total_pages: %"PRIu64"\n" \
+        "mem_pages: %"PRIu64"\n" \
+        "ratio: %.3f%%\n" \
+        "total_files: %"PRIu64"\n" \
+        "skip_files: %"PRIu64"\n" \
+        "",
         tp_buf,
         mp_buf,
-        (1.0*g_stats.mem_pages)/g_stats.total_pages*100
+        g_stats.total_pages,
+        g_stats.mem_pages,
+        (1.0*g_stats.mem_pages)/g_stats.total_pages*100,
+        g_stats.total_files,
+        g_stats.skip_files
     );
-    fprintf(stderr, "========================== SUMMARY ==========================\n");
+    fprintf(stderr, "========================== SUMMARY ==========================\n"C_NONE);
 }
 
 void touch(char *fname) {
@@ -119,6 +158,9 @@ void touch(char *fname) {
         char buf[128];
         bytes_to_human(buf, file_size);        
         fprintf(stderr, "filename: %s\tfilesize:%s\n", fname, buf);
+        return;
+    }
+    if(file_size <= 0) {
         return;
     }
 
@@ -169,8 +211,11 @@ void traverse_porcess(int pid) {
     char buf[128];
     snprintf(buf, sizeof(buf), "/proc/%d/fd/", pid);
 
-    if(access(buf, F_OK|R_OK) != 0) {
+    if(access(buf, F_OK) != 0) {
         logger(ERROR, "maybe process %d is not exists.", pid);
+    }
+    if(access(buf, R_OK) != 0) {
+        logger(ERROR, "access pid %d permission denied.", pid);
     }
 
     DIR *proc_dir = opendir(buf);
@@ -224,11 +269,11 @@ int main(int argc, char **argv) {
 
     while((ch = getopt(argc, argv, "p:r:dlh")) != -1) {
         switch(ch) {
-        case 'p': pid = atoi(optarg); break;
-        case 'h': is_usage = 1; break;
-        case 'd': opt.is_detail = 1; break;
-        case 'l': opt.just_list_file = 1; break;
-        case 'r': opt.regular = strdup(optarg); break;
+          case 'p': pid = atoi(optarg); break;
+          case 'h': is_usage = 1; break;
+          case 'd': opt.is_detail = 1; break;
+          case 'l': opt.just_list_file = 1; break;
+          case 'r': opt.regular = strdup(optarg); break;
         }
     }
     if(is_usage || !pid) usage();
