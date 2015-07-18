@@ -104,10 +104,10 @@ void print_summary() {
     bytes_to_human(mp_buf,g_stats.mem_pages*4096), 
     fprintf(stderr, "\n========================== SUMMARY ==========================\n");
     fprintf(stderr, 
-        "SUMMARY: total size:%s, page in mem: %s, ratio: %.5f\n", 
+        "SUMMARY: total size:%s, page in mem: %s, ratio: %.3f%%\n", 
         tp_buf,
         mp_buf,
-        (1.0*g_stats.mem_pages)/g_stats.total_pages
+        (1.0*g_stats.mem_pages)/g_stats.total_pages*100
     );
     fprintf(stderr, "========================== SUMMARY ==========================\n");
 }
