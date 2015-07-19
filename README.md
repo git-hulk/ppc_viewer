@@ -1,30 +1,45 @@
 # fip_viewer
 
-查看进程打开的文件以及pagecache使用情况
-
-## 功能
-
-1. 根据 pid 查看进程打开文件的情况
+### 1） fip_viewer 是干什么的? 
 
 ```
-[root@hzwy_1_12 src]# ./fip_viewer -d -p 8258
-/var/run/zabbix/zabbix_agentd.pid    page_in_mem:0  total_pages:1
+1. 查看进程打开了哪些文件
+
+2. 查看进程 pagecache 的使用情况, 同时可以看单个文件的 pagecahce.
 ```
 
-2. 根据 pid 查看进程每个文件以及整体使用 pagecache 的情况
+[Github代码](https://github.com/git-hulk/fip_viewer)
+
+### 2) 怎么用
 
 ```
-[root@hzwy_1_12 src]# ./fip_viewer -d -p 8258
-/var/run/zabbix/zabbix_agentd.pid    page_in_mem:0  total_pages:1
-
-========================== SUMMARY ==========================
-SUMMARY: total size:4.00K, page in mem: 0B, ratio: 0.00000%
-========================== SUMMARY ==========================
+$ git clone https://github.com/git-hulk/fip_viewer.git
+$ cd fip_viewer/src
+$ make
+$ ./fip_viewer -p pid 
 ```
 
-## TODO
+#### 2.1) 支持选项
 
-1. 支持根据正则过滤文件
+```
+-p pid 必选，选择查看的pid
 
-2. 部分 bug 修复
+-d 可选, 详细模式，会打印当前进程打开的文件, 对应的pagecache使用情况
+
+-l 可选, 查看当前进程打开的文件
+
+-h 可选, 打印帮助
+```
+
+#### 2.2) 简单打印输出
+
+![image](http://hulkdev-hulkimgs.stor.sinaapp.com/imgs/fip_viewer.jpeg)
+
+
+### 3） TODO
+
+
+> 1. 后台运行支持 
+> 2. 支持正则过滤查看文件
+> 3. 长期的 bug 修复
 
