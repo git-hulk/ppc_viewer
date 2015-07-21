@@ -1,6 +1,6 @@
 /*
 * ***************************************************************
- * fip_view.c is tools to view file and pagecache in process
+ * fip_view.c main implemention of ppc_viewer is here 
  * author by @git-hulk at 2015-07-18 
  * Copyright (C) 2015 Inc.
  * *************************************************************
@@ -81,51 +81,60 @@ static void print_file(char *fname) {
     int f_len = strlen(fname);
     int d_len = strlen(delete_str);
     FILE *fp; 
-    fp = (opt.output_file == NULL) ? stdout : fopen(opt.output_file,"a");
+
     // 文件被删除的fd
+    fp = (opt.output_file == NULL) ? stdout : fopen(opt.output_file,"a");
     if(strncmp(fname+f_len-d_len, delete_str, d_len) == 0) {
         fprintf(fp, "%s\n", fname);
-        return;
+        goto close_fp;
     }
 
     struct stat sb;
     if(stat(fname, &sb) != 0) {
         logger(WARN, "can't stat file :%s", fname);
-        return;
+        goto close_fp;
     }
     if(!S_ISREG(sb.st_mode)) {
-        return;
+        goto close_fp;
     }
 
     char buf[128];
     bytes_to_human(buf, sb.st_size);        
     fprintf(fp, "filename: %s\tfilesize:%s\n", fname, buf);
+
+close_fp:
     if(opt.output_file) {
         fclose(fp);
     }
 }
 
-static void touch(char *fname) {
-    if(!check_file(fname)) return;
-
-    int file_size;
+static uint64_t get_file_size(char *fname) {
     struct stat sb;
     if(stat(fname, &sb) != 0) {
         g_stats.skip_files++; 
         logger(WARN, "can't stat file %s", fname); 
-        return;
+        return 0;
     }
     if(!S_ISREG(sb.st_mode)) {
         g_stats.skip_files++; 
         logger(DEBUG, "not regular file %s", fname); 
-        return;
+        return 0;
     }
     if(sb.st_size <= 0) {
         g_stats.skip_files++; 
         logger(INFO, "empty file %s, skip..", fname);
+        return 0;
+    }
+    return sb.st_size;
+}
+
+static void touch(char *fname) {
+    if(!check_file(fname)) return;
+
+    uint64_t file_size;
+    if((file_size = get_file_size(fname)) == 0) {
         return;
     }
-    file_size = sb.st_size;
 
     int fd, npages;
     char *mmap_addr;
@@ -145,9 +154,8 @@ static void touch(char *fname) {
         close(fd);
         return;
     }
+
     npages = PAGE_NUM(file_size);
-    g_stats.total_pages += npages;
-     
     unsigned char mincore_vec[npages];
     mincore(mmap_addr, file_size, mincore_vec);
     int i, pages_in_mem = 0;
@@ -156,6 +164,7 @@ static void touch(char *fname) {
             pages_in_mem++;
         }
     }
+
     if(opt.is_detail) {
         FILE *fp;
         fp = (opt.output_file == NULL) ? stdout : fopen(opt.output_file,"a");
@@ -164,8 +173,10 @@ static void touch(char *fname) {
             fclose(fp);
         }
     }
-    g_stats.mem_pages += pages_in_mem;
+
     g_stats.total_files++;
+    g_stats.total_pages += npages;
+    g_stats.mem_pages += pages_in_mem;
 
     if(munmap(mmap_addr, file_size) != 0) {
         logger(INFO, "file %s munmap failed.", fname);
