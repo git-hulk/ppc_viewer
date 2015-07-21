@@ -2,7 +2,7 @@
 
 > process pagecache viewer
 
-### 1） fip_viewer 是干什么的? 
+### 1） ppc_viewer 是干什么的? 
 
 ```
 1. 查看进程打开了哪些文件
