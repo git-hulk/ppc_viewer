@@ -44,6 +44,8 @@
 struct option {
     int is_detail;
     int just_list_file;
+    int interval;
+    int count;
     char *regular;
 };
 
@@ -256,6 +258,8 @@ static void usage() {
     printf("FIP_VIEWER is process file/pagecache finder.\n");
     printf("  -h show usage.\n");
     printf("  -p pid.\n");
+    printf("  -i interval.\n");
+    printf("  -c count.\n");
     printf("  -d detail mode.\n");
     printf("  -l just list files.\n");
     printf("============== FIP_VIEWER USAGE ==============\n");
@@ -264,12 +268,15 @@ static void usage() {
 
 int main(int argc, char **argv) {
     char ch;
+    int i;
     int is_usage = 0;
     int pid = 0;
 
-    while((ch = getopt(argc, argv, "p:r:dlh")) != -1) {
+    while((ch = getopt(argc, argv, "p:r:dlhi:c:")) != -1) {
         switch(ch) {
           case 'p': pid = atoi(optarg); break;
+          case 'i': opt.interval = atoi(optarg); break;
+          case 'c': opt.count = atoi(optarg); break;
           case 'h': is_usage = 1; break;
           case 'd': opt.is_detail = 1; break;
           case 'l': opt.just_list_file = 1; break;
@@ -278,8 +285,21 @@ int main(int argc, char **argv) {
     }
     if(is_usage || !pid) usage();
 
+    if(opt.interval <= 0) {
+        opt.interval = 0;
+    }
+    if(opt.count <= 0) {
+        opt.count = 1;
+    }
     page_size = sysconf(_SC_PAGESIZE);
     traverse_porcess(pid);
+    if(opt.interval > 0) {
+        for(i = 1; i < opt.count; i++) {
+            memset(&g_stats, '\0', sizeof(struct global_stats));
+            sleep(opt.interval);
+            traverse_porcess(pid);
+        }
+    }
     free(opt.regular);
     return 0;
 }

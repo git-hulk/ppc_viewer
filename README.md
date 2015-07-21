@@ -1,4 +1,6 @@
-# fip_viewer
+# ppc_viewer
+
+> process pagecache viewer
 
 ### 1） fip_viewer 是干什么的? 
 
@@ -8,15 +10,15 @@
 2. 查看进程 pagecache 的使用情况, 同时可以看单个文件的 pagecahce.
 ```
 
-[Github代码](https://github.com/git-hulk/fip_viewer)
+[Github代码](https://github.com/git-hulk/ppc_viewer)
 
 ### 2) 怎么用
 
 ```
-$ git clone https://github.com/git-hulk/fip_viewer.git
-$ cd fip_viewer/src
+$ git clone https://github.com/git-hulk/ppc_viewer.git
+$ cd ppc_viewer/src
 $ make
-$ ./fip_viewer -p pid 
+$ ./ppc_viewer -p pid 
 ```
 
 #### 2.1) 支持选项
