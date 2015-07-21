@@ -19,124 +19,21 @@
  */
 
 #include <stdio.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include <dirent.h>
+#include <unistd.h>
 #include <fcntl.h>
-#include <time.h>
 #include <inttypes.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include "ppc_viewer.h"
 
-#define C_RED "\033[31m"
-#define C_GREEN "\033[32m"
-#define C_YELLOW "\033[33m"
-#define C_PURPLE "\033[35m"
-#define C_NONE "\033[0m"
-
-#define PAGE_IN_MEM(c) ((c) & 0x1)
-#define PAGE_ALIGNED(addr) ((((long)addr) & (page_size - 1))== 0)
-#define PAGE_NUM(filesize) (((filesize)+page_size-1)/page_size) 
-
-enum LEVEL {
-    DEBUG = 1,
-    INFO,
-    WARN,
-    ERROR
-}; 
-
-struct option {
-    int is_detail;
-    int just_list_file;
-    int interval;
-    int count;
-    enum LEVEL log_level;
-    char *log_file;
-    char *regular;
-    char *output_file;
-};
-
-struct global_stats {
-    uint64_t total_pages;
-    uint64_t mem_pages;
-    uint64_t total_files;
-    uint64_t skip_files; 
-};
-
-static int page_size = 0;
 static struct global_stats g_stats;
-static struct option opt; 
-void logger(enum LEVEL loglevel,char *fmt, ...) {
-    FILE *fp;
-    va_list ap;
-    time_t now;
-    char buf[4096];
-    char t_buf[64];
-    char *msg = NULL;
-    const char *color = "";
+struct option opt; 
 
-    if(loglevel < opt.log_level) return;
-
-    va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
-    va_end(ap);
-    switch(loglevel) {
-      case DEBUG: msg = "DEBUG"; break;
-      case INFO:  msg = "INFO";  color = C_YELLOW ; break;
-      case WARN:  msg = "WARN";  color = C_PURPLE; break;
-      case ERROR: msg = "ERROR"; color = C_RED; break;
-    }
-
-    now = time(NULL);
-    strftime(t_buf,64,"%Y-%m-%d %H:%M:%S",localtime(&now));
-    fp = (opt.log_file == NULL) ? stdout : fopen(opt.log_file,"a");
-    if(opt.log_file) {
-        fprintf(fp, "[%s] [%s] %s\n", t_buf, msg, buf);
-        fclose(fp);
-    } else {
-        fprintf(fp, "%s[%s] [%s] %s\n"C_NONE, color, t_buf, msg, buf);
-    }
-
-    if(loglevel >= ERROR) {
-        exit(1);
-    }
-}
-
-void bytes_to_human(char *s, unsigned long long n) {
-    double d;
-    if (n < 1024) {
-        sprintf(s,"%lluB",n);
-        return;
-    } else if (n < (1024*1024)) {
-        d = (double)n/(1024);
-        sprintf(s,"%.2fK",d);
-    } else if (n < (1024LL*1024*1024)) {
-        d = (double)n/(1024*1024);
-        sprintf(s,"%.2fM",d);
-    } else if (n < (1024LL*1024*1024*1024)) {
-        d = (double)n/(1024LL*1024*1024);
-        sprintf(s,"%.2fG",d);
-    } else {
-        d = (double)n/(1024LL*1024*1024*1024);
-        sprintf(s,"%.2fT",d);
-    }
-}
-
-int check_file(char *fname) {
-    if(fname[0] != '/') {
-        return 0;
-    }
-    if(opt.regular && strncmp(opt.regular, fname, strlen(opt.regular)) != 0) {
-        return 0;
-    }
-    return 1;
-}
-
-void print_summary() {
+static void print_summary() {
     char tp_buf[128];
     char mp_buf[128];
     double mem_ratio = 0;
@@ -179,7 +76,7 @@ void print_summary() {
     }
 }
 
-void print_file(char *fname) {
+static void print_file(char *fname) {
     char *delete_str = " (deleted)";
     int f_len = strlen(fname);
     int d_len = strlen(delete_str);
@@ -208,7 +105,7 @@ void print_file(char *fname) {
     }
 }
 
-void touch(char *fname) {
+static void touch(char *fname) {
     if(!check_file(fname)) return;
 
     int file_size;
@@ -278,6 +175,9 @@ void touch(char *fname) {
 
 // traverse /proc/{pid}/fd/* to get regular file list.
 void traverse_porcess(int pid) {
+    // reset stats
+    memset(&g_stats, '\0', sizeof(struct global_stats));
+
     if(!pid) return;
 
     char buf[128];
@@ -334,68 +234,4 @@ void traverse_porcess(int pid) {
         print_summary();
     }
     closedir(proc_dir);
-}
-
-static void usage() {
-    fprintf(stderr, "\n============== PPC_VIEWER USAGE ==============\n");
-    fprintf(stderr, "PPC_VIEWER is process file/pagecache finder.\n");
-    fprintf(stderr, "  -h show usage.\n");
-    fprintf(stderr, "  -p pid.\n");
-    fprintf(stderr, "  -i interval.\n");
-    fprintf(stderr, "  -c count.\n");
-    fprintf(stderr, "  -d detail mode.\n");
-    fprintf(stderr, "  -l just list files.\n");
-    fprintf(stderr, "  -o result output file path.\n");
-    fprintf(stderr, "  -f log file path\n");
-    fprintf(stderr, "  -e loglevel, 1:DEBUG, 2:INFO 3:WARN 4:ERROR\n");
-    fprintf(stderr, "============== PPC_VIEWER USAGE ==============\n");
-    exit(1);
-}
-
-int main(int argc, char **argv) {
-    char ch;
-    int i;
-    int is_usage = 0;
-    int pid = 0;
-
-    while((ch = getopt(argc, argv, "p:r:dlhi:c:f:e:o:")) != -1) {
-        switch(ch) {
-          case 'p': pid = atoi(optarg); break;
-          case 'i': opt.interval = atoi(optarg); break;
-          case 'c': opt.count = atoi(optarg); break;
-          case 'h': is_usage = 1; break;
-          case 'd': opt.is_detail = 1; break;
-          case 'l': opt.just_list_file = 1; break;
-          case 'r': opt.regular = strdup(optarg); break;
-          case 'f': opt.log_file = strdup(optarg); break;
-          case 'e': opt.log_level = atoi(optarg); break;
-          case 'o': opt.output_file = strdup(optarg); break;
-        }
-    }
-    if(is_usage || !pid) usage();
-
-    if(opt.interval <= 0) {
-        opt.interval = 0;
-    }
-    if(opt.count <= 0) {
-        opt.count = 1;
-    }
-    if(opt.log_level <= 0 ) {
-        opt.log_level = INFO;
-    }
-
-    page_size = sysconf(_SC_PAGESIZE);
-    traverse_porcess(pid);
-    if(opt.interval > 0) {
-        for(i = 1; i < opt.count; i++) {
-            memset(&g_stats, '\0', sizeof(struct global_stats));
-            sleep(opt.interval);
-            traverse_porcess(pid);
-        }
-    }
-
-    free(opt.regular);
-    free(opt.log_file);
-    free(opt.output_file);
-    return 0;
 }

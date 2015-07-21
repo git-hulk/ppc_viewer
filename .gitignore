@@ -30,4 +30,9 @@
 
 # Debug files
 *.dSYM/
-fip_viewer
+*.swo
+*.swm
+*.swn
+tags
+*.swp
+ppc_viewer
