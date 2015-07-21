@@ -214,11 +214,18 @@ void touch(char *fname) {
     int file_size;
     struct stat sb;
     if(stat(fname, &sb) != 0) {
+        g_stats.skip_files++; 
         logger(WARN, "can't stat file %s", fname); 
         return;
     }
     if(!S_ISREG(sb.st_mode)) {
+        g_stats.skip_files++; 
         logger(DEBUG, "not regular file %s", fname); 
+        return;
+    }
+    if(sb.st_size <= 0) {
+        g_stats.skip_files++; 
+        logger(INFO, "empty file %s, skip..", fname);
         return;
     }
     file_size = sb.st_size;
@@ -237,6 +244,7 @@ void touch(char *fname) {
         } else {
             logger(INFO, "mmap address is not page aligned.");
         }
+        g_stats.skip_files++; 
         close(fd);
         return;
     }
