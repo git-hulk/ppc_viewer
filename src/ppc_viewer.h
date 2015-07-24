@@ -1,5 +1,5 @@
 /*
-* ***************************************************************
+ * ***************************************************************
  * ppc_view.h
  * author by @git-hulk at 2015-07-18 
  * Copyright (C) 2015 Inc.
@@ -29,7 +29,7 @@ struct option {
     int interval;
     int count;
     enum LEVEL log_level;
-	char *path;
+    char *path;
     char *log_file;
     char *regular;
     char *output_file;
