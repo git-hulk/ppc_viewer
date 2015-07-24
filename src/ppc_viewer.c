@@ -186,7 +186,6 @@ static void touch(char *fname) {
     close(fd);
 }
 
-
 void handle_link(char *path){
     char fname[2048];
     int fname_size;
@@ -207,8 +206,7 @@ void handle_link(char *path){
     if(opt.just_list_file) {
         print_file(fname);
     } 
-    else 
-    {
+    else {
         touch(fname);
     }
 }

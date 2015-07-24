@@ -8,6 +8,7 @@ extern struct option opt;
 static void usage() {
     fprintf(stderr, "\n============== PPC_VIEWER USAGE ==============\n");
     fprintf(stderr, "PPC_VIEWER is process file/pagecache finder.\n");
+    fprintf(stderr, "You must and can only specify one way to run PPC_VIEWER, pid or directory\n");
     fprintf(stderr, "  -h show usage.\n");
     fprintf(stderr, "  -p pid.\n");
     fprintf(stderr, "  -t directory.\n");
@@ -27,6 +28,7 @@ int main(int argc, char **argv) {
     int i;
     int is_usage = 0;
     int pid = 0;
+    const int INF = 0x3fffffff;
 
     while((ch = getopt(argc, argv, "p:r:t:dlhi:c:f:e:o:")) != -1) {
         switch(ch) {
@@ -51,32 +53,25 @@ int main(int argc, char **argv) {
     }
 
     if(opt.interval <= 0) {
-        opt.interval = 0;
+        opt.interval = 1;
     }
-    if(opt.count <= 0) {
+
+    if(0 == opt.count) {
+        opt.count = INF;
+    }
+    else if (opt.count < 0) {
         opt.count = 1;
     }
+
     if(opt.log_level <= 0 ) {
         opt.log_level = INFO;
     }
 
-    if ( pid ) {
-        traverse_porcess(pid);
-        if(opt.interval > 0) {
-            for(i = 1; i < opt.count; i++) {
-                sleep(opt.interval);
-                traverse_porcess(pid);
-            }
+    for (i=0; i<opt.count; ++i){
+        if ( i ) {
+            sleep(opt.interval);
         }
-    }
-    else {
-        traverse_path(opt.path, 1);
-        if (opt.interval > 0) {
-            for (i = 1; i < opt.count; i++) {
-                sleep(opt.interval);
-                traverse_path(opt.path, 1);
-            }
-        }
+        pid ? traverse_porcess(pid) : traverse_path(opt.path, 1);
     }
 
     free(opt.regular);
