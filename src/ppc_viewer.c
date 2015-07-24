@@ -1,5 +1,5 @@
 /*
-* ***************************************************************
+ * ***************************************************************
  * fip_view.c main implemention of ppc_viewer is here 
  * author by @git-hulk at 2015-07-18 
  * Copyright (C) 2015 Inc.
@@ -52,22 +52,22 @@ static void print_summary() {
     }
     fprintf(fp, "========================== SUMMARY ==========================\n");
     fprintf(fp, 
-        "total_size: %s\n" \
-        "mem_page_size: %s\n" \
-        "total_pages: %"PRIu64"\n" \
-        "mem_pages: %"PRIu64"\n" \
-        "ratio: %.3f%%\n" \
-        "total_files: %"PRIu64"\n" \
-        "skip_files: %"PRIu64"\n" \
-        "",
-        tp_buf,
-        mp_buf,
-        g_stats.total_pages,
-        g_stats.mem_pages,
-        mem_ratio,
-        g_stats.total_files,
-        g_stats.skip_files
-    );
+            "total_size: %s\n" \
+            "mem_page_size: %s\n" \
+            "total_pages: %"PRIu64"\n" \
+            "mem_pages: %"PRIu64"\n" \
+            "ratio: %.3f%%\n" \
+            "total_files: %"PRIu64"\n" \
+            "skip_files: %"PRIu64"\n" \
+            "",
+            tp_buf,
+            mp_buf,
+            g_stats.total_pages,
+            g_stats.mem_pages,
+            mem_ratio,
+            g_stats.total_files,
+            g_stats.skip_files
+           );
     fprintf(fp, "========================== SUMMARY ==========================\n");
     if(opt.output_file) {
         fclose(fp);
@@ -111,8 +111,10 @@ close_fp:
 static uint64_t get_file_size(char *fname) {
     struct stat sb;
     if(stat(fname, &sb) != 0) {
-        g_stats.skip_files++; 
-        logger(WARN, "can't stat file %s", fname); 
+        if ( '/' == fname[0]) {
+            g_stats.skip_files++; 
+            logger(WARN, "can't stat file %s", fname); 
+        }
         return 0;
     }
     if(!S_ISREG(sb.st_mode)) {
@@ -184,12 +186,37 @@ static void touch(char *fname) {
     close(fd);
 }
 
+
+void handle_link(char *path){
+    char fname[2048];
+    int fname_size;
+    memset(fname, '\0', sizeof(fname));
+    fname_size = readlink(path, fname, sizeof(fname));
+    if(fname_size == -1) {
+        logger(WARN, "readlink error, file: %s", path);
+        return;
+    }
+    if(fname_size == sizeof(fname)) {
+        logger(INFO, "may be filename is too long");
+        return;
+    }
+    if(!check_file(fname)) {
+        return;
+    }
+
+    if(opt.just_list_file) {
+        print_file(fname);
+    } 
+    else 
+    {
+        touch(fname);
+    }
+}
+
 // traverse /proc/{pid}/fd/* to get regular file list.
 void traverse_porcess(int pid) {
     // reset stats
     memset(&g_stats, '\0', sizeof(struct global_stats));
-
-    if(!pid) return;
 
     char buf[128];
     snprintf(buf, sizeof(buf), "/proc/%d/fd/", pid);
@@ -209,35 +236,15 @@ void traverse_porcess(int pid) {
     struct dirent *de;
     while((de = readdir(proc_dir)) != NULL) {
         if(strcmp(de->d_name, ".") == 0 ||
-            strcmp(de->d_name, "..") == 0) {
+                strcmp(de->d_name, "..") == 0) {
             continue;
         }
         // NOTE: file in /proc/{pid}/fd/* should be link.
-        char fname[2048];
-        int fname_size;
+        char dirent_path[2048];
         if(DT_LNK == de->d_type) {
-            memset(buf, '\0', sizeof(buf));
-            memset(fname, '\0', sizeof(fname));
-            snprintf(buf, sizeof(buf), "/proc/%d/fd/%s", pid, de->d_name);
-
-            fname_size = readlink(buf, fname, sizeof(fname));
-            if(fname_size == -1) {
-                logger(WARN, "readlink error, file: %s", buf);
-                continue;
-            }
-            if(fname_size == sizeof(fname)) {
-                logger(INFO, "may be filename is too long");
-                continue;
-            }
-            if(!check_file(fname)) {
-                continue;
-            }
-
-            if(opt.just_list_file) {
-                print_file(fname);
-            } else {
-                touch(fname);
-            }
+            memset(dirent_path, '\0', sizeof(dirent_path));
+            snprintf(dirent_path, sizeof(dirent_path), "/proc/%d/fd/%s", pid, de->d_name);
+            handle_link(dirent_path);
         }
     }
 
@@ -245,4 +252,57 @@ void traverse_porcess(int pid) {
         print_summary();
     }
     closedir(proc_dir);
+}
+
+void traverse_path(char *path, int flag) {
+
+    if (flag){
+        memset(&g_stats, '\0', sizeof(struct global_stats));
+        if(access(path, F_OK) != 0) {
+            logger(ERROR, "maybe this file or directory is not exists: %s .", path );
+        }
+        if(access(path, R_OK) != 0) {
+            logger(ERROR, "access this file or directory permission denied :%s .", path);
+        }
+    }
+
+    struct stat sb;
+    if (lstat(path, &sb) != 0){
+        logger(WARN, "can't stat this file or directory: %s .", path);
+    }
+    if (S_ISLNK(sb.st_mode)){
+        handle_link(path);
+    }
+    else if(S_ISREG(sb.st_mode)){
+        if(opt.just_list_file) {
+            print_file(path);
+        } 
+        else {
+            touch(path);
+        }
+    }
+    else if (S_ISDIR(sb.st_mode)){
+
+        DIR *proc_dir = opendir(path);
+        if(!proc_dir) {
+            logger(ERROR, "open %s for read failed.", path);
+        }
+
+        struct dirent *de;
+        while((de = readdir(proc_dir)) != NULL) {
+            if(strcmp(de->d_name, ".") == 0 ||
+                    strcmp(de->d_name, "..") == 0) {
+                continue;
+            }
+            char dirent_path[2048];
+            memset(dirent_path, '\0', sizeof(dirent_path));
+            snprintf(dirent_path, sizeof(dirent_path), "%s/%s", path, de->d_name);
+            traverse_path(dirent_path, 0);
+        }
+        closedir(proc_dir);
+    }
+
+    if(flag && !opt.just_list_file) {
+        print_summary();
+    }
 }

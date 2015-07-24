@@ -1,5 +1,5 @@
 /*
-* ***************************************************************
+ * ***************************************************************
  * util.c utility function for ppc_viewer 
  * author by @git-hulk at 2015-07-18 
  * Copyright (C) 2015 Inc.
@@ -46,10 +46,10 @@ void logger(enum LEVEL loglevel,char *fmt, ...)
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
     switch(loglevel) {
-      case DEBUG: msg = "DEBUG"; break;
-      case INFO:  msg = "INFO";  color = C_YELLOW ; break;
-      case WARN:  msg = "WARN";  color = C_PURPLE; break;
-      case ERROR: msg = "ERROR"; color = C_RED; break;
+        case DEBUG: msg = "DEBUG"; break;
+        case INFO:  msg = "INFO";  color = C_YELLOW ; break;
+        case WARN:  msg = "WARN";  color = C_PURPLE; break;
+        case ERROR: msg = "ERROR"; color = C_RED; break;
     }
 
     now = time(NULL);
@@ -67,9 +67,11 @@ void logger(enum LEVEL loglevel,char *fmt, ...)
     }
 }
 
-int check_file(char *fname) {
-    if(fname[0] != '/') {
-        return 0;
+int check_file(char *fname) {	
+    if (NULL == opt.path ) {
+        if(fname[0] != '/') {
+            return 0;
+        }
     }
     if(opt.regular && strncmp(opt.regular, fname, strlen(opt.regular)) != 0) {
         return 0;
