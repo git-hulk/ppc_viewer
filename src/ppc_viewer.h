@@ -29,6 +29,7 @@ struct option {
     int interval;
     int count;
     enum LEVEL log_level;
+	char *path;
     char *log_file;
     char *regular;
     char *output_file;
@@ -42,5 +43,6 @@ struct global_stats {
 };
 
 void traverse_porcess(int pid);
+void traverse_path(char *path, int flag);
 #endif
 
