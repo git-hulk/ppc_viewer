@@ -52,15 +52,12 @@ int main(int argc, char **argv) {
         usage();
     }
 
-    if(opt.interval <= 0) {
-        opt.interval = 1;
-    }
-
-    if(0 == opt.count) {
-        opt.count = INF;
-    }
-    else if (opt.count < 0) {
+    if(opt.count <= 0 && opt.interval <= 0) {
         opt.count = 1;
+    } else if(opt.count <= 0 && opt.interval > 0) {
+        opt.count = INF;
+    } else if(opt.count > 0 && opt.interval <= 0) {
+        opt.interval = 1;
     }
 
     if(opt.log_level <= 0 ) {
