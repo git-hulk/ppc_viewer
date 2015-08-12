@@ -26,9 +26,21 @@ $ ./ppc_viewer -p pid
 ```
 -p pid 必选，选择查看的pid
 
+-t directory 和pid 必须有一个，检查目录的pagecache使用情况。 
+
 -d 可选, 详细模式，会打印当前进程打开的文件, 对应的pagecache使用情况
 
 -l 可选, 查看当前进程打开的文件
+
+-o [output file path]可选, 结果输出到文件
+
+-e [loglevel] 可选, 1:DEBUG, 2:INFO 3:WARN 4:ERROR
+
+-f [log file path]可选，日志文件路径
+
+-i [interval] 可选，查询间隔
+
+-c [count] 可选， 查询次数
 
 -h 可选, 打印帮助
 ```
