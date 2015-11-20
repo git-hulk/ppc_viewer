@@ -59,7 +59,7 @@ void logger(enum LEVEL loglevel,char *fmt, ...)
         fprintf(fp, "[%s] [%s] %s\n", t_buf, msg, buf);
         fclose(fp);
     } else {
-        fprintf(fp, "%s[%s] [%s] %s\n"C_NONE, color, t_buf, msg, buf);
+        fprintf(fp, "%s[%s] [%s] %s"C_NONE"\n", color, t_buf, msg, buf);
     }
 
     if(loglevel >= ERROR) {
